@@ -12,6 +12,7 @@ The post contains the repository and branch, author(s), commit count, 3–6 conc
 
    - `TELEGRAM_BOT_TOKEN` — token issued by BotFather.
    - `TELEGRAM_CHAT_ID` — the public channel username such as `@my_devlog`, or the numeric channel ID such as `-1001234567890`.
+   - `TELEGRAM_MESSAGE_THREAD_ID` — optional numeric ID of a forum topic. Omit it to post in the general chat.
    - `ANTHROPIC_API_KEY` — optional. Omit it to use commit-message fallback only.
 
 4. Copy this project into the repository that should publish DevLogs, including `.github/workflows/devlog.yml`, then push it to GitHub. Every subsequent push to any branch triggers the workflow.
@@ -26,6 +27,8 @@ Add a GitHub Actions repository **variable** named `CLAUDE_MODEL` to override th
 | --- | ---: | --- |
 | `MAX_DIFF_CHARS` | `60000` | Maximum diff characters sent to Claude. |
 | `MAX_COMMIT_LINKS` | `10` | Maximum direct commit links shown before the compare link. |
+
+To publish into a Telegram forum topic, send a command addressed to the bot inside that topic, call Bot API `getUpdates`, and copy the message's `message_thread_id` into the `TELEGRAM_MESSAGE_THREAD_ID` GitHub Secret. Change that Secret to move future posts to another topic; delete it to return to the general chat.
 
 The complete diff remains on GitHub. Binary content is not included in normal git patch output, and the bounded text sent to Claude is used only when its API key exists.
 

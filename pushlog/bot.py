@@ -383,7 +383,12 @@ def render_messages(
     return chunks
 
 
-def send_telegram(messages: Iterable[str], token: str, chat_id: str) -> None:
+def send_telegram(
+    messages: Iterable[str],
+    token: str,
+    chat_id: str,
+    message_thread_id: int | None = None,
+) -> None:
     endpoint = f"https://api.telegram.org/bot{token}/sendMessage"
     reply_to: int | None = None
     for text in messages:
@@ -395,6 +400,8 @@ def send_telegram(messages: Iterable[str], token: str, chat_id: str) -> None:
             "parse_mode": "HTML",
             "link_preview_options": {"is_disabled": True},
         }
+        if message_thread_id is not None:
+            payload["message_thread_id"] = message_thread_id
         if reply_to is not None:
             payload["reply_parameters"] = {"message_id": reply_to}
 
@@ -451,13 +458,20 @@ def run() -> None:
     try:
         diff_limit = max(1_000, int(os.getenv("MAX_DIFF_CHARS", str(DEFAULT_DIFF_LIMIT))))
         commit_link_limit = max(0, int(os.getenv("MAX_COMMIT_LINKS", str(DEFAULT_COMMIT_LINK_LIMIT))))
+        thread_value = os.getenv("TELEGRAM_MESSAGE_THREAD_ID", "").strip()
+        message_thread_id = int(thread_value) if thread_value else None
+        if message_thread_id is not None and message_thread_id <= 0:
+            raise ValueError
     except ValueError as exc:
-        raise PushLogError("MAX_DIFF_CHARS and MAX_COMMIT_LINKS must be integers") from exc
+        raise PushLogError(
+            "MAX_DIFF_CHARS and MAX_COMMIT_LINKS must be integers; "
+            "TELEGRAM_MESSAGE_THREAD_ID must be a positive integer"
+        ) from exc
 
     diff = read_diff(push, diff_limit)
     points, used_ai = generate_points(push, diff)
     messages = render_messages(push, points, commit_link_limit)
-    send_telegram(messages, token, chat_id)
+    send_telegram(messages, token, chat_id, message_thread_id)
     LOG.info(
         "Published %d commit(s) from %s/%s in %d Telegram message(s); AI=%s",
         push.commit_count,

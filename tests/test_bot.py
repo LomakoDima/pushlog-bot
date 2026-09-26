@@ -149,6 +149,16 @@ class PushLogTests(unittest.TestCase):
             {"message_id": 42},
         )
 
+    @patch("pushlog.bot.requests.post")
+    def test_publication_can_target_a_forum_topic(self, post):
+        response = Mock(ok=True, status_code=200)
+        response.json.return_value = {"ok": True, "result": {"message_id": 42}}
+        post.return_value = response
+
+        send_telegram(["message"], "token", "-100123", message_thread_id=987)
+
+        self.assertEqual(post.call_args.kwargs["json"]["message_thread_id"], 987)
+
 
 if __name__ == "__main__":
     unittest.main()
