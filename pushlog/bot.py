@@ -10,6 +10,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
+from urllib.parse import quote
 
 import requests
 
@@ -323,6 +324,25 @@ def _link(url: str, label: str) -> str:
     return f'<a href="{html.escape(url, quote=True)}">{html.escape(label)}</a>'
 
 
+def _commit_subject(commit: Commit, maximum: int = 180) -> str:
+    subject = re.sub(r"\s+", " ", commit.message.splitlines()[0]).strip()
+    if len(subject) > maximum:
+        subject = subject[: maximum - 1].rstrip() + "…"
+    return subject or "Update code"
+
+
+def _author_label(author: str) -> str:
+    """Link GitHub usernames while leaving display names as plain text."""
+    escaped = html.escape(author)
+    if re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})", author):
+        return _link(f"https://github.com/{quote(author, safe='')}", author)
+    return escaped
+
+
+def _quote_block(lines: Iterable[str]) -> str:
+    return "<blockquote>" + "\n".join(lines) + "</blockquote>"
+
+
 def _telegram_length(text: str) -> int:
     # Telegram measures entity offsets in UTF-16 code units. Counting the raw
     # HTML as well is conservative because markup is removed during parsing.
@@ -335,50 +355,67 @@ def render_messages(
     commit_link_limit: int = DEFAULT_COMMIT_LINK_LIMIT,
 ) -> list[str]:
     count_label = "commit" if push.commit_count == 1 else "commits"
-    author_label = ", ".join(push.authors[:3])
-    if len(push.authors) > 3:
-        author_label += f" +{len(push.authors) - 3}"
+    branch_url = f"{push.repository_url}/tree/{quote(push.branch, safe='/')}"
+    title = f"[{push.repository}:{push.branch}]"
+    header = f"<b>⚡️ {_link(branch_url, title)}</b>"
+    metadata = f"<b>{push.commit_count} new {count_label}</b>"
 
-    header = f"<b>{html.escape(push.repository)}</b> · <code>{html.escape(push.branch)}</code>"
-    metadata = f"{push.commit_count} {count_label}"
-    if author_label:
-        metadata += f" by {html.escape(author_label)}"
-    bullet_lines = [f"• {html.escape(point)}" for point in points]
-    body = "\n".join([header, metadata, "", *bullet_lines])
-
-    links = [
-        _link(commit.url, commit.sha[:7])
-        for commit in push.commits[: max(0, commit_link_limit)]
+    visible_commits = push.commits[: max(0, commit_link_limit)]
+    commit_lines = [
+        f'{_link(commit.url, commit.sha[:7])} “{html.escape(_commit_subject(commit))}”:'
+        for commit in visible_commits
     ]
     if len(push.commits) > commit_link_limit:
-        links.append(f"+{len(push.commits) - commit_link_limit} more")
-    footer_lines: list[str] = []
-    if links:
-        footer_lines.append("Commits: " + " · ".join(links))
-    footer_lines.append(
-        f"{_link(push.compare_url, 'View changes')} · {_link(push.repository_url, 'Repository')}"
-    )
-    footer = "\n".join(footer_lines)
+        commit_lines.append(f"+{len(push.commits) - commit_link_limit} more commits")
 
-    complete = f"{body}\n\n{footer}"
+    bullet_lines = [f"• {html.escape(point)}" for point in points]
+    detail_lines = ["<b>Key points:</b>", *bullet_lines]
+    details = _quote_block(detail_lines)
+
+    author_labels = [_author_label(author) for author in push.authors[:3]]
+    if len(push.authors) > 3:
+        author_labels.append(f"+{len(push.authors) - 3}")
+    footer_parts: list[str] = []
+    if author_labels:
+        footer_parts.append("by " + ", ".join(author_labels))
+    if push.commit_count == 1 and push.commits:
+        footer_parts.append("view " + _link(push.commits[0].url, "commit"))
+    else:
+        footer_parts.append("view " + _link(push.compare_url, "changes"))
+    footer_parts.append(_link(push.repository_url, "repository"))
+    footer = " · ".join(footer_parts)
+
+    prefix = "\n".join([header, metadata, "", *commit_lines])
+    complete = f"{prefix}\n\n{details}\n\n{footer}"
     if _telegram_length(complete) <= TELEGRAM_TEXT_LIMIT:
         return [complete]
 
-    # AI output is bounded, but defensive splitting keeps malformed or unusually
-    # long fallback text from making Telegram reject the whole publication.
+    # AI output is bounded, but defensive splitting keeps unusually long input
+    # from making Telegram reject the whole publication. Each chunk gets its own
+    # complete blockquote so Telegram always receives valid HTML.
     chunks: list[str] = []
-    current = "\n".join([header, metadata, ""])
+    current_prefix = prefix
+    current_points: list[str] = []
     for line in bullet_lines:
-        candidate = f"{current}\n{line}" if current else line
-        if _telegram_length(candidate) > 3800 and current.strip():
-            chunks.append(current.rstrip())
-            current = f"<b>{html.escape(push.repository)} — continued</b>\n\n{line}"
+        candidate_details = _quote_block(["<b>Key points:</b>", *current_points, line])
+        candidate = f"{current_prefix}\n\n{candidate_details}"
+        if _telegram_length(candidate) > 3800 and current_points:
+            chunks.append(
+                f"{current_prefix}\n\n"
+                + _quote_block(["<b>Key points:</b>", *current_points])
+            )
+            current_prefix = f"<b>⚡️ {html.escape(push.repository)} — continued</b>"
+            current_points = [line]
         else:
-            current = candidate
-    if _telegram_length(current + footer) + 2 <= TELEGRAM_TEXT_LIMIT:
-        chunks.append(f"{current.rstrip()}\n\n{footer}")
+            current_points.append(line)
+
+    current = f"{current_prefix}\n\n" + _quote_block(
+        ["<b>Key points:</b>", *current_points]
+    )
+    if _telegram_length(current + "\n\n" + footer) <= TELEGRAM_TEXT_LIMIT:
+        chunks.append(f"{current}\n\n{footer}")
     else:
-        chunks.append(current.rstrip())
+        chunks.append(current)
         chunks.append(footer)
     return chunks
 

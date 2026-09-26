@@ -35,18 +35,22 @@ The complete diff remains on GitHub. Binary content is not included in normal gi
 ## Post format
 
 ```text
-StoryModEngine · feature/vfx-editor
-3 commits by alice
+⚡️ [StoryModEngine:feature/vfx-editor]
+3 new commits
 
+a1b2c3d “feat(vfx): add sub-emitter support”:
+e4f5a6b “feat(vfx): implement glow rendering”:
+12ab34c “fix: particle spawning edge case”:
+
+Key points:
 • Added sub-emitter support with particle event triggers.
 • Implemented glow and soft-edge rendering.
 • Fixed particle spawning and editor UI issues.
 
-Commits: a1b2c3d · e4f5a6b · 12ab34c
-View changes · Repository
+by alice · view changes · repository
 ```
 
-Telegram HTML formatting makes the project, commit hashes, compare page, and repository clickable. If a generated post exceeds Telegram's 4096-character limit, PushLog splits it into a reply chain while preserving valid HTML.
+Telegram HTML formatting makes the project title, commit hashes, author, compare page, and repository clickable. Commit subjects use typographic quotation marks, and the technical points are displayed as a quote block. If a generated post exceeds Telegram's 4096-character limit, PushLog splits it into a reply chain while preserving valid HTML.
 
 ## Local checks
 

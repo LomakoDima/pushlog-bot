@@ -103,7 +103,10 @@ class PushLogTests(unittest.TestCase):
         self.assertEqual(len(messages), 1)
         self.assertIn("Story&lt;Engine&gt;", messages[0])
         self.assertIn("Fixed A &lt; B &amp; C.", messages[0])
-        self.assertIn("View changes", messages[0])
+        self.assertIn("[Story&lt;Engine&gt;:feature/vfx-editor]", messages[0])
+        self.assertIn("<blockquote><b>Key points:</b>", messages[0])
+        self.assertIn("“feat(vfx): add sub-emitter support”:", messages[0])
+        self.assertIn("view <a", messages[0])
         self.assertIn("1111111", messages[0])
         self.assertLessEqual(len(messages[0]), 4096)
 
@@ -114,6 +117,25 @@ class PushLogTests(unittest.TestCase):
         self.assertGreater(len(messages), 1)
         self.assertTrue(all(_telegram_length(message) <= 4096 for message in messages))
         self.assertTrue(all(message.count("<b>") == message.count("</b>") for message in messages))
+        self.assertTrue(
+            all(message.count("<blockquote>") == message.count("</blockquote>") for message in messages)
+        )
+
+    def test_single_commit_uses_requested_devlog_structure(self):
+        event = self.event()
+        event["size"] = 1
+        event["commits"] = event["commits"][:1]
+        push = parse_push(event)
+
+        message = render_messages(push, ["Adds sub-emitter support."])[0]
+
+        self.assertIn("⚡️", message)
+        self.assertIn("[StoryModEngine:feature/vfx-editor]", message)
+        self.assertIn("<b>1 new commit</b>", message)
+        self.assertIn("“feat(vfx): add sub-emitter support”:", message)
+        self.assertIn("<b>Key points:</b>", message)
+        self.assertIn("by <a href=\"https://github.com/alice\">alice</a>", message)
+        self.assertIn("view <a href=", message)
 
     def test_load_event_reads_utf8_json(self):
         with tempfile.NamedTemporaryFile(
