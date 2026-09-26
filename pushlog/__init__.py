@@ -1,0 +1,2 @@
+"""PushLog Telegram publisher."""
+
