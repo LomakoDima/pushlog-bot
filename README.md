@@ -17,6 +17,35 @@ The post contains the repository and branch, author(s), commit count, 3–6 conc
 
 4. Copy this project into the repository that should publish DevLogs, including `.github/workflows/devlog.yml`, then push it to GitHub. Every subsequent push to any branch triggers the workflow.
 
+## Configure many repositories at once
+
+You do not need to copy PushLog's Python files or enter the Telegram settings in every project. This repository also works as a central composite GitHub Action. Target repositories contain only a small workflow that calls `LomakoDima/pushlog-bot@main`, so future bot updates are picked up centrally.
+
+The bootstrap script discovers all repositories owned by the authenticated GitHub account, skips archived repositories and forks by default, stores the Telegram values as encrypted GitHub Actions secrets, and creates or updates `.github/workflows/devlog.yml` on each default branch.
+
+1. Create a fine-grained GitHub personal access token with access to the repositories you want to configure. Grant repository permissions for **Contents**, **Actions**, **Secrets**, and **Workflows** as read/write where GitHub offers them. A classic token needs `repo` and `workflow` scopes.
+2. Install the bootstrap dependency once:
+
+   ```powershell
+   python -m pip install -r requirements-bootstrap.txt
+   ```
+
+3. Preview the repositories that will be changed. The token is requested through a hidden prompt and is not saved:
+
+   ```powershell
+   python scripts/bootstrap_repositories.py
+   ```
+
+4. Apply the configuration. Enter the Telegram bot token once, chat ID `-1004478645731`, topic ID `553`, and optionally the Claude API key:
+
+   ```powershell
+   python scripts/bootstrap_repositories.py --apply
+   ```
+
+Use `--repo OWNER/REPO` one or more times to configure only selected repositories. Run the same command again after creating new repositories; already configured workflows are left unchanged. The central `pushlog-bot` repository is skipped because it already has its own workflow.
+
+GitHub Actions push triggers are repository-scoped, so every target repository must contain a workflow file. The bootstrap script automates that unavoidable GitHub requirement; no per-project code editing or repeated secret entry is needed. Organization-owned repositories can instead use organization-level secrets.
+
 The workflow uses the built-in GitHub token only to check out repository contents. Secrets are never passed as command-line arguments or printed by the script.
 
 ## Optional configuration

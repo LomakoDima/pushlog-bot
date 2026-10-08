@@ -1,0 +1,2 @@
+-r requirements.txt
+PyNaCl>=1.5,<2

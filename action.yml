@@ -1,0 +1,25 @@
+name: PushLog DevLog
+description: Publish a concise Telegram DevLog for the current GitHub push
+
+runs:
+  using: composite
+  steps:
+    - name: Check out the pushed revision
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+        cache: pip
+        cache-dependency-path: ${{ github.action_path }}/requirements.txt
+
+    - name: Install PushLog dependencies
+      shell: bash
+      run: python -m pip install --disable-pip-version-check --requirement "$GITHUB_ACTION_PATH/requirements.txt"
+
+    - name: Publish DevLog to Telegram
+      shell: bash
+      run: python "$GITHUB_ACTION_PATH/main.py"
